@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RJ's Soccer Scoreboard (v3)</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#141b3f;
+      --panel-border:#23306b;
+      --accent:#a8c6ff;
+      --text:#e8eefc;
+      --muted:#9bb0e8;
+      --live:#b3002d;
+      --upc:#23488a;
+      --fin:#2a6634;
+      --warn:#ffc107;
+    }
+    html,body{height:100%;}
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; padding:0; overflow-x:hidden;}
+    header{position:sticky; top:0; background:#111737cc; backdrop-filter: blur(6px); padding:12px 16px; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:10;}
+    h1{margin:0; font-size:20px;}
+    #last-updated{font-size:12px; opacity:.8;}
+    #cors-tip{font-size:12px; color:#ffe1a6; margin-top:6px; display:none;}
+    .wallpaper{
+      position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.06;
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:24px;
+      padding:40px; filter:grayscale(100%);
+    }
+    .tile{
+      background:#ffffff10; border:1px solid #ffffff18; border-radius:12px;
+      display:flex; align-items:center; justify-content:center; font-weight:900; font-size:42px;
+    }
+    .tile img{max-width:100%; max-height:100%; object-fit:contain; opacity:.9;}
+    .container{position:relative; z-index:1; padding:16px; display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px;}
+    .card{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+    .team-header{display:flex; align-items:center; gap:10px;}
+    .badge{width:28px; height:28px; border-radius:50%; background:#223; display:flex; align-items:center; justify-content:center; font-weight:700; overflow:hidden;}
+    .badge img{width:28px; height:28px; object-fit:contain;}
+    .team-name{font-weight:700; font-size:16px;}
+    .status{font-size:12px; padding:2px 8px; border-radius:999px; display:inline-block;}
+    .live{background:var(--live); color:#fff;}
+    .upcoming{background:var(--upc); color:#beddff;}
+    .final{background:var(--fin); color:#d7ffe2;}
+    .meta{font-size:13px; opacity:.95;}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+    .score{font-variant-numeric: tabular-nums; font-size:18px; font-weight:800;}
+    a{color:var(--accent); text-decoration:none;}
+    a:hover{text-decoration:underline;}
+    footer{padding:12px; text-align:center; color:var(--muted); font-size:12px; opacity:.9;}
+    .err{color:#ffb3c1; font-size:12px;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RJ's Soccer Scoreboard (v3)</h1>
+    <div id="last-updated">Loading…</div>
+    <div id="cors-tip">Tip: If you opened this as a file and see errors, <b>serve it over http</b> (e.g., GitHub Pages / Netlify, or <code>python -m http.server</code>) so your browser allows cross‑site requests.</div>
+  </header>
+
+  <div class="wallpaper" id="wallpaper"></div>
+
+  <div class="container" id="cards"></div>
+
+  <footer>
+    Data: <a href="https://www.thesportsdb.com" target="_blank" rel="noreferrer">TheSportsDB</a> • Auto-refreshes every 60 seconds.
+  </footer>
+
+<script>
+// Core list + aliases to improve search hits
+const TEAM_ALIASES = {
+  "Arsenal": ["Arsenal FC"],
+  "Borussia Dortmund": ["BVB"],
+  "MSV Duisburg": ["Meidericher SV 02 Duisburg","Meidericher SV","Duisburg"],
+  "Bonnyrigg Rose Athletic": ["Bonnyrigg Rose"],
+  "FC Lorient": ["Lorient"],
+  "US Lecce": ["Lecce"],
+  "Forge FC": ["Forge Hamilton"],
+  "Real Oviedo": ["Oviedo"],
+  "Malmo FF": ["Malmö FF","IFK Malmö"],
+  "Panathinaikos": ["Panathinaikos FC"],
+  "FC St. Pauli": ["Sankt Pauli","St Pauli"],
+  "Sydney FC": ["Sydney Football Club"],
+  "Jeonbuk Hyundai Motors": ["Jeonbuk Motors","Jeonbuk"]
+};
+const TEAMS = Object.keys(TEAM_ALIASES);
+
+const API_BASE = "https://www.thesportsdb.com/api/v1/json/3";
+
+// Prepopulate wallpaper with tiles (initials). Badges will replace tiles as they load.
+(function initWallpaper(){
+  const w = document.getElementById('wallpaper');
+  TEAMS.forEach(name => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.textContent = name.split(' ').map(s=>s[0]).join('').slice(0,3).toUpperCase();
+    tile.dataset.team = name;
+    w.appendChild(tile);
+  });
+})();
+
+function el(tag, cls, txt){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+function fmtDateTimeUTCtoLocal(isoStr){
+  const d = new Date(isoStr);
+  if (isNaN(d)) return isoStr || "TBD";
+  const opts = {weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'};
+  return d.toLocaleString(undefined, opts);
+}
+function statusPill(type){
+  const span = el('span', 'status ' + type, type.toUpperCase());
+  return span;
+}
+async function fetchJSON(url){
+  // if running from file://, show tip
+  if (location.protocol === 'file:'){
+    document.getElementById('cors-tip').style.display = 'block';
+  }
+  try{
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }catch(e){
+    const prox = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+    const res2 = await fetch(prox);
+    if (!res2.ok) throw new Error('HTTP '+res2.status);
+    return await res2.json();
+  }
+}
+function pickBestEvent(events){
+  if (!events || events.length === 0) return null;
+  const live = events.find(e => (e.strStatus && e.strStatus.toLowerCase().includes('live')));
+  if (live) return {type:'live', ev: live};
+  const now = new Date();
+  const withTime = events
+    .map(e => {
+      const ts = e.strTimestamp ? new Date(e.strTimestamp)
+        : (e.dateEvent && e.strTime ? new Date(e.dateEvent+'T'+e.strTime+'Z') : null);
+      return {e, ts};
+    })
+    .filter(x => x.ts instanceof Date && !isNaN(x.ts));
+  const upcoming = withTime.filter(x => x.ts > now).sort((a,b)=>a.ts-b.ts)[0];
+  if (upcoming) return {type:'upcoming', ev: upcoming.e};
+  const finished = events.find(e => (e.strStatus && e.strStatus.toLowerCase().includes('match finished')) || (e.intHomeScore!=null && e.intAwayScore!=null));
+  if (finished) return {type:'final', ev: finished};
+  return {type:'upcoming', ev: events[0]};
+}
+async function findTeam(name){
+  const tries = [name, ...(TEAM_ALIASES[name] || [])];
+  for (let q of tries){
+    const search = await fetchJSON(`${API_BASE}/searchteams.php?t=${encodeURIComponent(q)}`);
+    if (search && search.teams && search.teams[0]) return search.teams[0];
+  }
+  return null;
+}
+function buildCard(teamName){
+  const card = el('div', 'card');
+  const header = el('div', 'team-header');
+  const badge = el('div', 'badge');
+  const badgeTxt = el('div', '', teamName.split(' ').map(s=>s[0]).join('').slice(0,3).toUpperCase());
+  badge.appendChild(badgeTxt);
+  const title = el('div', 'team-name', teamName);
+  header.appendChild(badge);
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = el('div', 'meta', 'Searching…');
+  card.appendChild(meta);
+
+  const row1 = el('div', 'row');
+  const statusSpan = statusPill('upcoming');
+  const score = el('div', 'score', '');
+  row1.appendChild(statusSpan);
+  row1.appendChild(score);
+  card.appendChild(row1);
+
+  const row2 = el('div', 'meta', '');
+  card.appendChild(row2);
+
+  const err = el('div', 'err', '');
+  card.appendChild(err);
+
+  async function load(){
+    try{
+      const team = await findTeam(teamName);
+      if (!team){
+        meta.textContent = 'Team not found on TheSportsDB';
+        err.textContent = 'Tried aliases: ' + (TEAM_ALIASES[teamName]||[]).join(', ');
+        return;
+      }
+      // Update wallpaper tile to badge
+      if (team.strTeamBadge){
+        const w = document.getElementById('wallpaper');
+        const tile = [...w.children].find(x => x.dataset.team === teamName);
+        if (tile){
+          tile.innerHTML = `<img src="${team.strTeamBadge}" alt="${team.strTeam} badge">`;
+        }
+        // Card badge
+        badge.innerHTML = `<img src="${team.strTeamBadge}" alt="${team.strTeam} badge">`;
+      }
+      const id = team.idTeam;
+      const [next, last] = await Promise.all([
+        fetchJSON(`${API_BASE}/eventsnext.php?id=${id}`),
+        fetchJSON(`${API_BASE}/eventslast.php?id=${id}`)
+      ]);
+      const events = []
+        .concat(next && next.events ? next.events : [])
+        .concat(last && last.results ? last.results : []);
+      const pick = pickBestEvent(events);
+      if (!pick){
+        meta.textContent = team.strTeam;
+        row2.textContent = `No events available`;
+        return;
+      }
+      const ev = pick.ev;
+      const home = ev.strHomeTeam;
+      const away = ev.strAwayTeam;
+      const isHome = (home && team.strTeam && home.toLowerCase() === team.strTeam.toLowerCase());
+      const opp = isHome ? away : home;
+      const comp = ev.strLeague || ev.strTournament || '—';
+      let iso = ev.strTimestamp || (ev.dateEvent ? (ev.dateEvent + (ev.strTime ? 'T'+ev.strTime+'Z' : 'T00:00:00Z')) : null);
+      const timeTxt = iso ? fmtDateTimeUTCtoLocal(iso) : 'TBD';
+
+      statusSpan.className = 'status ' + pick.type;
+      statusSpan.textContent = pick.type.toUpperCase();
+
+      if (ev.intHomeScore != null && ev.intAwayScore != null){
+        score.textContent = `${ev.intHomeScore} - ${ev.intAwayScore}`;
+      } else {
+        score.textContent = isHome ? 'vs' : '@';
+      }
+
+      meta.innerHTML = `<strong>${isHome ? team.strTeam : opp}</strong> vs <strong>${isHome ? opp : team.strTeam}</strong>`;
+      row2.textContent = `${comp} • ${timeTxt}`;
+
+      if (ev.idEvent){
+        const link = el('a');
+        link.href = `https://www.thesportsdb.com/event/${ev.idEvent}`;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = "Details";
+        card.appendChild(link);
+      }
+
+    }catch(e){
+      err.textContent = 'Network/CORS error. Host this file (GitHub Pages/Netlify) or run a local server.';
+      console.error(teamName, e);
+    }
+  }
+
+  load();
+  return card;
+}
+
+function refreshTimeStamp(){
+  const t = new Date();
+  document.getElementById('last-updated').textContent = "Updated " + t.toLocaleTimeString();
+}
+
+function build(){
+  const wrap = document.getElementById('cards');
+  wrap.innerHTML = "";
+  TEAMS.forEach(name => wrap.appendChild(buildCard(name)));
+  refreshTimeStamp();
+}
+
+build();
+setInterval(build, 60000);
+</script>
+</body>
+</html>
