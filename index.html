@@ -4,77 +4,117 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RJ's Soccer Scoreboard (v4)</title>
+  <title>RJ's Soccer Scoreboard (v5)</title>
   <style>
     :root{
-      --bg:#0b1020;
-      --panel:#141b3f;
-      --panel-border:#23306b;
-      --accent:#a8c6ff;
-      --text:#e8eefc;
-      --muted:#9bb0e8;
-      --live:#b3002d;
-      --upc:#23488a;
-      --fin:#2a6634;
+      --bg:#0b1020; --panel:#141b3f; --panel-border:#23306b; --accent:#a8c6ff;
+      --text:#e8eefc; --muted:#9bb0e8; --live:#b3002d; --upc:#23488a; --fin:#2a6634;
     }
     html,body{height:100%;}
-    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; padding:0; overflow-x:hidden;}
-    header{position:sticky; top:0; background:#111737cc; backdrop-filter: blur(6px); padding:12px 16px; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:10;}
-    h1{margin:0; font-size:20px;}
-    #last-updated{font-size:12px; opacity:.8;}
-    .wallpaper{
-      position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.06;
-      display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:24px;
-      padding:40px; filter:grayscale(100%);
-    }
-    .tile{
-      background:#ffffff10; border:1px solid #ffffff18; border-radius:12px;
-      display:flex; align-items:center; justify-content:center; font-weight:900; font-size:42px;
-    }
+    body{font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;
+         background:var(--bg); color:var(--text); margin:0; padding:0; overflow-x:hidden;}
+    header{position:sticky; top:0; background:#111737cc; backdrop-filter: blur(6px);
+           padding:12px 16px; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:10;}
+    h1{margin:0; font-size:20px;} #last-updated{font-size:12px; opacity:.8;}
+    .wallpaper{position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.06;
+               display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:24px;
+               padding:40px; filter:grayscale(100%);}
+    .tile{background:#ffffff10; border:1px solid #ffffff18; border-radius:12px;
+          display:flex; align-items:center; justify-content:center; font-weight:900; font-size:42px;}
     .tile img{max-width:100%; max-height:100%; object-fit:contain; opacity:.9;}
-    .container{position:relative; z-index:1; padding:16px; display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px;}
-    .card{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+    .container{position:relative; z-index:1; padding:16px; display:grid;
+               grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px;}
+    .card{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
+          padding:12px; display:flex; flex-direction:column; gap:8px;}
     .team-header{display:flex; align-items:center; gap:10px;}
-    .badge{width:28px; height:28px; border-radius:50%; background:#223; display:flex; align-items:center; justify-content:center; font-weight:700; overflow:hidden;}
+    .badge{width:28px; height:28px; border-radius:50%; background:#223; display:flex;
+           align-items:center; justify-content:center; font-weight:700; overflow:hidden;}
     .badge img{width:28px; height:28px; object-fit:contain;}
     .team-name{font-weight:700; font-size:16px;}
     .status{font-size:12px; padding:2px 8px; border-radius:999px; display:inline-block;}
-    .live{background:var(--live); color:#fff;}
-    .upcoming{background:var(--upc); color:#beddff;}
+    .live{background:var(--live); color:#fff;} .upcoming{background:var(--upc); color:#beddff;}
     .final{background:var(--fin); color:#d7ffe2;}
-    .meta{font-size:13px; opacity:.95;}
-    .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+    .meta{font-size:13px; opacity:.95;} .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
     .score{font-variant-numeric: tabular-nums; font-size:18px; font-weight:800;}
-    a{color:var(--accent); text-decoration:none;}
-    a:hover{text-decoration:underline;}
-    footer{padding:12px; text-align:center; color:#muted; font-size:12px; opacity:.9;}
+    a{color:var(--accent); text-decoration:none;} a:hover{text-decoration:underline;}
+    footer{padding:12px; text-align:center; color:var(--muted); font-size:12px; opacity:.9;}
     .err{color:#ffb3c1; font-size:12px;}
+    .diag{position:fixed; right:12px; bottom:12px; background:#0f1533; border:1px solid #22306b;
+          padding:8px 10px; border-radius:8px; font-size:12px; color:#cfe1ff; max-width:360px;}
+    .diag button{margin-top:6px;}
   </style>
 </head>
 <body>
   <header>
-    <h1>RJ's Soccer Scoreboard (v4)</h1>
+    <h1>RJ's Soccer Scoreboard (v5)</h1>
     <div id="last-updated">Loading…</div>
   </header>
 
   <div class="wallpaper" id="wallpaper"></div>
   <div class="container" id="cards"></div>
 
+  <div class="diag" id="diag">
+    <div><strong>Diagnostics</strong></div>
+    <div id="diag-msg">Waiting…</div>
+    <button id="diag-test">Test fetch</button>
+  </div>
+
   <footer>
     Data: <a href="https://www.thesportsdb.com" target="_blank" rel="noreferrer">TheSportsDB</a> • Auto-refreshes every 60 seconds.
   </footer>
 
 <script>
-// Always use public key 3 and ALWAYS proxy through AllOrigins to avoid CORS on GitHub Pages.
 const API_BASE = "https://www.thesportsdb.com/api/v1/json/3";
-const PROXY = "https://api.allorigins.win/raw?url=";
+// Proxy list (we'll try in order)
+const PROXIES = [
+  (url)=>`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url)=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url)=>`https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`
+];
+// Unpack responses by proxy type
+async function fetchViaProxies(url){
+  let lastErr;
+  for (let i=0;i<PROXIES.length;i++){
+    const purl = PROXIES[i](url + (url.includes("?")?"&":"?") + "_ts=" + Date.now());
+    try{
+      const res = await fetch(purl, {cache:"no-store"});
+      if (!res.ok) throw new Error("HTTP "+res.status);
+      // AllOrigins/get wraps JSON in {contents: "..."} string; others return raw JSON
+      if (i === 0){ // AllOrigins
+        const wrap = await res.json();
+        const text = wrap.contents;
+        return JSON.parse(text);
+      } else {
+        return await res.json();
+      }
+    }catch(e){
+      lastErr = e;
+      // try next proxy
+    }
+  }
+  throw lastErr || new Error("All proxies failed");
+}
 
-// Known team IDs (skip search where we can)
+// Request queue to avoid rate-limits
+const Q = [];
+let busy = false;
+function enqueue(fn){ Q.push(fn); pump(); }
+async function pump(){
+  if (busy) return;
+  busy = true;
+  while (Q.length){
+    const job = Q.shift();
+    try{ await job(); }catch(e){ /* handled per job */ }
+    await new Promise(r=>setTimeout(r, 800)); // 0.8s spacing
+  }
+  busy = false;
+}
+
 const TEAM_IDS = {
   "Arsenal": "133604",
   "Borussia Dortmund": "133739",
   "MSV Duisburg": "134620",
-  "Bonnyrigg Rose Athletic": null, // may not exist in DB or under variant name
+  "Bonnyrigg Rose Athletic": null,
   "FC Lorient": "135105",
   "US Lecce": "134152",
   "Forge FC": "161197",
@@ -85,17 +125,14 @@ const TEAM_IDS = {
   "Sydney FC": "134142",
   "Jeonbuk Hyundai Motors": "134474"
 };
-
-// Aliases for search fallback
 const TEAM_ALIASES = {
   "Bonnyrigg Rose Athletic": ["Bonnyrigg Rose"],
   "Malmo FF": ["Malmö FF"],
   "Forge FC": ["Forge Hamilton"]
 };
-
 const TEAMS = Object.keys(TEAM_IDS);
 
-// seed wallpaper
+// Wallpaper seed
 (function initWallpaper(){
   const w = document.getElementById('wallpaper');
   TEAMS.forEach(name => {
@@ -113,27 +150,16 @@ function el(tag, cls, txt){
   if (txt !== undefined) e.textContent = txt;
   return e;
 }
-
-async function fetchJSON(url){
-  // Add cache-busting query to minimize proxy caching
-  const full = PROXY + encodeURIComponent(url + (url.includes("?") ? "&" : "?") + "_ts=" + Date.now());
-  const res = await fetch(full, { cache: "no-store" });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
-}
-
 function fmtDateTimeUTCtoLocal(isoStr){
   const d = new Date(isoStr);
   if (isNaN(d)) return isoStr || "TBD";
   const opts = {weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'};
   return d.toLocaleString(undefined, opts);
 }
-
 function statusPill(type){
   const span = el('span', 'status ' + type, type.toUpperCase());
   return span;
 }
-
 function pickBestEvent(events){
   if (!events || events.length === 0) return null;
   const live = events.find(e => (e.strStatus && e.strStatus.toLowerCase().includes('live')));
@@ -152,12 +178,11 @@ function pickBestEvent(events){
   if (finished) return {type:'final', ev: finished};
   return {type:'upcoming', ev: events[0]};
 }
-
 async function searchTeamByName(name){
   const tries = [name, ...(TEAM_ALIASES[name] || [])];
   for (let q of tries){
     const url = `${API_BASE}/searchteams.php?t=${encodeURIComponent(q)}`;
-    const data = await fetchJSON(url);
+    const data = await fetchViaProxies(url);
     if (data && data.teams && data.teams[0]) return data.teams[0];
   }
   return null;
@@ -188,86 +213,60 @@ function buildCard(teamName){
   const err = el('div', 'err', '');
   card.appendChild(err);
 
-  async function load(){
+  async function job(){
     try{
-      // Team record
       let team;
       const knownId = TEAM_IDS[teamName];
       if (knownId){
-        const url = `${API_BASE}/lookupteam.php?id=${knownId}`;
-        const data = await fetchJSON(url);
+        const data = await fetchViaProxies(`${API_BASE}/lookupteam.php?id=${knownId}`);
         team = data && data.teams && data.teams[0];
       }
       if (!team){
         team = await searchTeamByName(teamName);
       }
-      if (!team){
-        meta.textContent = 'Team not found';
-        return;
-      }
+      if (!team){ meta.textContent='Team not found'; return; }
 
-      // Wallpaper badge
       if (team.strTeamBadge){
         badge.innerHTML = `<img src="${team.strTeamBadge}" alt="${team.strTeam} badge">`;
         const w = document.getElementById('wallpaper');
         const tile = [...w.children].find(x => x.dataset.team === teamName);
-        if (tile){
-          tile.innerHTML = `<img src="${team.strTeamBadge}" alt="${team.strTeam} badge">`;
-        }
+        if (tile){ tile.innerHTML = `<img src="${team.strTeamBadge}" alt="${team.strTeam} badge">`; }
       }
 
-      // Events
       const id = team.idTeam;
-      const [next, last] = await Promise.all([
-        fetchJSON(`${API_BASE}/eventsnext.php?id=${id}`),
-        fetchJSON(`${API_BASE}/eventslast.php?id=${id}`)
-      ]);
-      const events = []
-        .concat(next && next.events ? next.events : [])
-        .concat(last && last.results ? last.results : []);
+      const next = await fetchViaProxies(`${API_BASE}/eventsnext.php?id=${id}`);
+      const last = await fetchViaProxies(`${API_BASE}/eventslast.php?id=${id}`);
+      const events = [].concat(next && next.events ? next.events : [], last && last.results ? last.results : []);
       const pick = pickBestEvent(events);
-      if (!pick){
-        meta.textContent = team.strTeam;
-        row2.textContent = `No events available`;
-        return;
-      }
+      if (!pick){ meta.textContent = team.strTeam; row2.textContent='No events available'; return; }
+
       const ev = pick.ev;
-      const home = ev.strHomeTeam;
-      const away = ev.strAwayTeam;
+      const home = ev.strHomeTeam, away = ev.strAwayTeam;
       const isHome = (home && team.strTeam && home.toLowerCase() === team.strTeam.toLowerCase());
       const opp = isHome ? away : home;
       const comp = ev.strLeague || ev.strTournament || '—';
-      let iso = ev.strTimestamp || (ev.dateEvent ? (ev.dateEvent + (ev.strTime ? 'T'+ev.strTime+'Z' : 'T00:00:00Z')) : null);
+      const iso = ev.strTimestamp || (ev.dateEvent ? (ev.dateEvent + (ev.strTime ? 'T'+ev.strTime+'Z' : 'T00:00:00Z')) : null);
       const timeTxt = iso ? fmtDateTimeUTCtoLocal(iso) : 'TBD';
 
       statusSpan.className = 'status ' + pick.type;
       statusSpan.textContent = pick.type.toUpperCase();
-
-      if (ev.intHomeScore != null && ev.intAwayScore != null){
-        score.textContent = `${ev.intHomeScore} - ${ev.intAwayScore}`;
-      } else {
-        score.textContent = isHome ? 'vs' : '@';
-      }
+      if (ev.intHomeScore!=null && ev.intAwayScore!=null){ score.textContent = `${ev.intHomeScore} - ${ev.intAwayScore}`; }
+      else { score.textContent = isHome ? 'vs' : '@'; }
 
       meta.innerHTML = `<strong>${isHome ? team.strTeam : opp}</strong> vs <strong>${isHome ? opp : team.strTeam}</strong>`;
       row2.textContent = `${comp} • ${timeTxt}`;
+      err.textContent = '';
 
       if (ev.idEvent){
-        const link = el('a');
-        link.href = `https://www.thesportsdb.com/event/${ev.idEvent}`;
-        link.target = "_blank";
-        link.rel = "noreferrer";
-        link.textContent = "Details";
-        card.appendChild(link);
+        const link = el('a'); link.href = `https://www.thesportsdb.com/event/${ev.idEvent}`;
+        link.target = "_blank"; link.rel = "noreferrer"; link.textContent = "Details"; card.appendChild(link);
       }
-
     }catch(e){
-      err.textContent = 'Fetch failed via proxy. Refresh in a minute (proxy may rate-limit briefly).';
-      console.error(teamName, e);
+      err.textContent = 'All proxies failed. They might be rate-limiting. It will retry automatically.';
+      console.error('Job error', teamName, e);
     }
   }
-
-  load();
+  enqueue(job);
   return card;
 }
 
@@ -282,6 +281,17 @@ function build(){
   TEAMS.forEach(name => wrap.appendChild(buildCard(name)));
   refreshTimeStamp();
 }
+
+document.getElementById('diag-test').addEventListener('click', async ()=>{
+  const elmsg = document.getElementById('diag-msg');
+  elmsg.textContent = 'Testing…';
+  try{
+    const data = await fetchViaProxies(`${API_BASE}/searchteams.php?t=Arsenal`);
+    elmsg.textContent = 'OK: received ' + (data.teams && data.teams.length ? data.teams.length : 0) + ' team(s).';
+  }catch(e){
+    elmsg.textContent = 'Proxy test failed: ' + e.message;
+  }
+});
 
 build();
 setInterval(build, 60000);
